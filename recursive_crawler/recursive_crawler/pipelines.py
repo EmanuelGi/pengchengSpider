@@ -10,6 +10,7 @@ import scrapy
 import redis
 import json
 import sys
+import re
 sys.path.append('../../../')
 import configs
 import config
@@ -44,10 +45,20 @@ class RecursiveCrawlerPipeline(object):
         try:
             cursor.execute(upsert)
             # 爬取的数据不推入redis中，直接保存到本地文件
+
             to_push = json.dumps(dict(item))
             # self.server.rpush('jsonl', to_push)
-            self.file.write(to_push)
-            self.file.write(',\n')
+            # self.file.write(to_push)
+            if "title" in item:
+                if self.get_question(item['title']):
+                    self.file.write(item['title'])
+                    self.file.write('\n')
+
+            if "description" in item:
+                sentence = (item['description']).split()
+                if self.get_question(sentence):
+                    self.file.write(sentence)
+                    self.file.write('\n')
         except Exception, e:
             print e.message
             self.db.rollback()
@@ -59,3 +70,12 @@ class RecursiveCrawlerPipeline(object):
     def close_spider(self, spider):
         self.db.close()
         self.file.close()
+
+    def get_question(self, text):
+        regex_str = "^([\u4E00-\u9FA5]+)\?$"
+        match_obj = re.findall(regex_str, text)
+        if match_obj:
+            return match_obj
+        else:
+            return None
+
